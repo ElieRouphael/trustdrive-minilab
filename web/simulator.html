@@ -1,0 +1,727 @@
+<title>TrustDrive Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --ground:#e9edf1; --panel:#ffffff; --panel2:#f2f5f8; --inset:#e3e8ee;
+  --ink:#16212c; --muted:#5c6b7a; --faint:#8a97a4; --line:#d5dce3;
+  --accent:#0e7c8b; --accent-ink:#ffffff;
+  --good:#1f9d57; --warn:#c68a12; --crit:#cf4257;
+  --grid:#dbe2e9;
+  --shadow:0 1px 2px rgba(20,30,40,.06),0 8px 24px rgba(20,30,40,.06);
+  --naive:#cf4257; --handover:#c68a12; --proposed:#1f9d57;
+}
+:root:not([data-theme="light"]){ @media (prefers-color-scheme:dark){
+  --ground:#0d141c; --panel:#141d27; --panel2:#1a2530; --inset:#0f1821;
+  --ink:#e7eef5; --muted:#8598a8; --faint:#5f7183; --line:#26333f;
+  --accent:#25b7c7; --accent-ink:#04222a;
+  --good:#3bbd73; --warn:#e0a83a; --crit:#e5647a;
+  --grid:#20303c;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+  --naive:#e5647a; --handover:#e0a83a; --proposed:#3bbd73;
+}}
+:root[data-theme="dark"]{
+  --ground:#0d141c; --panel:#141d27; --panel2:#1a2530; --inset:#0f1821;
+  --ink:#e7eef5; --muted:#8598a8; --faint:#5f7183; --line:#26333f;
+  --accent:#25b7c7; --accent-ink:#04222a;
+  --good:#3bbd73; --warn:#e0a83a; --crit:#e5647a;
+  --grid:#20303c;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+  --naive:#e5647a; --handover:#e0a83a; --proposed:#3bbd73;
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  line-height:1.45;-webkit-font-smoothing:antialiased}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.wrap{max-width:1220px;margin:0 auto;padding:20px 20px 40px}
+
+header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+  flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid var(--line);margin-bottom:18px}
+.brand h1{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em}
+.brand p{margin:3px 0 0;color:var(--muted);font-size:13px;max-width:60ch}
+.transport{display:flex;align-items:center;gap:8px}
+button{font-family:inherit;cursor:pointer;color:var(--ink);background:var(--panel);
+  border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px;font-weight:500}
+button:hover{border-color:var(--accent)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn-primary{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:600}
+select{font-family:inherit;background:var(--panel);color:var(--ink);border:1px solid var(--line);
+  border-radius:8px;padding:8px 10px;font-size:13px}
+
+.stats{display:flex;gap:18px}
+.stat{display:flex;flex-direction:column;align-items:flex-end}
+.stat .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint)}
+.stat .v{font-size:18px;font-weight:600}
+
+.console{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;align-items:start}
+@media (max-width:900px){.console{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.card .hd{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:11px 14px;border-bottom:1px solid var(--line)}
+.card .hd h2{margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.card .bd{padding:14px}
+
+.viewport{position:relative}
+#road{display:block;width:100%;height:auto;border-radius:0 0 12px 12px;background:var(--inset)}
+.hud{position:absolute;top:56px;left:12px;right:12px;display:flex;justify-content:space-between;
+  pointer-events:none;gap:8px;flex-wrap:wrap;z-index:2}
+.chip{font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:999px;
+  background:color-mix(in srgb,var(--panel) 82%,transparent);border:1px solid var(--line);
+  backdrop-filter:blur(3px)}
+.chip .mono{font-weight:600}
+.chip.ok{color:var(--good);border-color:color-mix(in srgb,var(--good) 45%,var(--line))}
+.chip.bad{color:var(--crit);border-color:color-mix(in srgb,var(--crit) 45%,var(--line))}
+
+.camwrap{display:flex;gap:14px;align-items:center}
+#camera{width:200px;height:150px;border-radius:8px;background:#10151a;border:1px solid var(--line);flex:0 0 auto;image-rendering:auto}
+.camnote{font-size:12.5px;color:var(--muted)}
+.camnote b{color:var(--ink);font-weight:600}
+.camnote .row{display:flex;justify-content:space-between;gap:12px;margin-top:6px}
+.camnote .row span:last-child{color:var(--ink)}
+
+/* controls */
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.seg button{position:relative;padding:9px 6px;font-weight:600;font-size:12.5px;line-height:1.15}
+.seg button small{display:block;font-weight:400;font-size:10.5px;color:var(--faint);margin-top:2px}
+.seg button[aria-pressed="true"]{border-width:2px;padding:8px 5px}
+.seg button[data-m="naive"][aria-pressed="true"]{border-color:var(--naive);color:var(--naive)}
+.seg button[data-m="handover"][aria-pressed="true"]{border-color:var(--handover);color:var(--handover)}
+.seg button[data-m="proposed"][aria-pressed="true"]{border-color:var(--proposed);color:var(--proposed)}
+
+.ctl{margin-top:15px}
+.ctl:first-child{margin-top:0}
+.ctl .lab{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+.ctl .lab label{font-size:12.5px;font-weight:500}
+.ctl .lab .val{font-size:12.5px;color:var(--ink)}
+.ctl .lab .val .u{color:var(--faint)}
+input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:22px;background:transparent;cursor:pointer;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:5px;border-radius:3px;
+  background:var(--track,linear-gradient(var(--line),var(--line)))}
+input[type=range]::-moz-range-track{height:5px;border-radius:3px;background:var(--line)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:15px;height:15px;
+  border-radius:50%;background:var(--accent);border:2px solid var(--panel);margin-top:-5px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:var(--accent);border:2px solid var(--panel)}
+input[type=range]:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+.odd-hint{font-size:10.5px;color:var(--faint);margin-top:2px}
+.odd-hint b{color:var(--warn);font-weight:600}
+
+.subhd{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);
+  margin:20px 0 4px;padding-top:14px;border-top:1px dashed var(--line)}
+.toggle{display:flex;align-items:center;justify-content:space-between;margin-top:12px}
+.toggle span{font-size:12.5px;font-weight:500}
+.switch{position:relative;width:44px;height:24px;flex:0 0 auto}
+.switch input{opacity:0;width:0;height:0;position:absolute}
+.switch .sl{position:absolute;inset:0;border-radius:999px;background:var(--line);transition:background .15s}
+.switch .sl::before{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:3px;left:3px;transition:transform .15s;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+.switch input:checked + .sl{background:var(--good)}
+.switch input:checked + .sl::before{transform:translateX(20px)}
+.switch input:focus-visible + .sl{outline:2px solid var(--accent);outline-offset:2px}
+
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.presets button{padding:6px 10px;font-size:12px;font-weight:500}
+
+/* telemetry */
+.telemetry{margin-top:16px}
+.gauges{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media (max-width:700px){.gauges{grid-template-columns:1fr}}
+.gauge .gl{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+.gauge .gl .name{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
+.gauge .gl .num{font-size:20px;font-weight:600}
+.bar{position:relative;height:12px;border-radius:6px;background:var(--panel2);overflow:hidden;border:1px solid var(--line)}
+.bar .fill{position:absolute;top:0;left:0;bottom:0;border-radius:6px 0 0 6px;transition:width .08s linear,background .2s}
+.bar .mark{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.65}
+.bar .mark::after{content:attr(data-l);position:absolute;top:-15px;left:50%;transform:translateX(-50%);
+  font-size:9.5px;color:var(--muted);white-space:nowrap}
+.authbar{display:flex;height:14px;border-radius:7px;overflow:hidden;border:1px solid var(--line)}
+.authbar .a{background:var(--proposed);transition:width .08s linear}
+.authbar .h{background:var(--naive);transition:width .08s linear}
+.gsub{display:flex;justify-content:space-between;margin-top:7px;font-size:11px;color:var(--muted)}
+.gsub b{color:var(--ink);font-weight:600}
+.spark{width:100%;height:30px;display:block;margin-top:8px}
+
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+@media (max-width:700px){.charts{grid-template-columns:1fr}}
+.chart canvas{width:100%;height:150px;display:block}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:11.5px;color:var(--muted)}
+.legend i{display:inline-block;width:11px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+
+footer{margin-top:22px;color:var(--faint);font-size:12px;line-height:1.6}
+footer code{font-family:"IBM Plex Mono",monospace;background:var(--panel2);padding:1px 5px;border-radius:4px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>TrustDrive Simulator</h1>
+      <p>Drag the road and driver conditions. Watch perception uncertainty, the model-based NIS and the integrity score decide how authority is shared between the automation and the driver.</p>
+    </div>
+    <div class="transport">
+      <div class="stats" aria-hidden="false">
+        <div class="stat"><span class="k">RMSE e_y</span><span class="v mono" id="s-rmse">0.00</span></div>
+        <div class="stat"><span class="k">Lane exits</span><span class="v mono" id="s-exits">0</span></div>
+      </div>
+      <select id="speed" title="Simulation speed">
+        <option value="0.5">0.5&times;</option>
+        <option value="1" selected>1&times;</option>
+        <option value="2">2&times;</option>
+        <option value="4">4&times;</option>
+      </select>
+      <button id="playbtn" class="btn-primary">Pause</button>
+      <button id="resetbtn">Reset</button>
+    </div>
+  </header>
+
+  <div class="console">
+    <!-- LEFT: viewports -->
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card viewport">
+        <div class="hd"><h2>Ground truth &mdash; road &amp; vehicle</h2>
+          <span class="mono" id="v-speed" style="font-size:12px;color:var(--muted)">15.0 m/s</span></div>
+        <div class="hud">
+          <span class="chip">e_y <span class="mono" id="hud-ey">0.00</span> m</span>
+          <span class="chip" id="hud-mode">automation</span>
+          <span class="chip ok" id="hud-odd">inside ODD</span>
+        </div>
+        <canvas id="road" width="700" height="380"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="hd"><h2>What the AI sees &mdash; camera</h2>
+          <span class="mono" id="cam-nis" style="font-size:12px;color:var(--muted)">NIS 0.0</span></div>
+        <div class="bd camwrap">
+          <canvas id="camera" width="200" height="150"></canvas>
+          <div class="camnote">
+            The perception network only ever sees this frame. As it degrades, the
+            <b>reported uncertainty</b> grows &mdash; but on an unfamiliar curve the frame still
+            looks valid, and only the NIS reveals the mismatch.
+            <div class="row"><span>reported &sigma; (e_y)</span><span class="mono" id="cam-sy">0.020 m</span></div>
+            <div class="row"><span>reported &sigma; (e_&psi;)</span><span class="mono" id="cam-sp">0.010 rad</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: controls -->
+    <div class="card">
+      <div class="hd"><h2>Controller &amp; conditions</h2></div>
+      <div class="bd">
+        <div class="seg" role="group" aria-label="Control architecture">
+          <button data-m="naive"><span>Naive AI</span><small>full trust</small></button>
+          <button data-m="handover"><span>Hard handover</span><small>&sigma; threshold</small></button>
+          <button data-m="proposed" aria-pressed="true"><span>Proposed</span><small>integrity-aware</small></button>
+        </div>
+
+        <div class="subhd" style="border-top:none;padding-top:14px">Perception conditions</div>
+
+        <div class="ctl">
+          <div class="lab"><label for="c-bright">Brightness</label><span class="val mono" id="o-bright">1.00</span></div>
+          <input type="range" id="c-bright" min="0.2" max="1" step="0.01" value="1">
+          <div class="odd-hint">ODD requires <b>&gt; 0.45</b></div>
+        </div>
+        <div class="ctl">
+          <div class="lab"><label for="c-blur">Camera blur &sigma;</label><span class="val mono"><span id="o-blur">0.0</span><span class="u"> px</span></span></div>
+          <input type="range" id="c-blur" min="0" max="3.5" step="0.05" value="0">
+          <div class="odd-hint">ODD requires <b>&lt; 1.6 px</b></div>
+        </div>
+        <div class="ctl">
+          <div class="lab"><label for="c-occ">Occlusion</label><span class="val mono" id="o-occ">0%</span></div>
+          <input type="range" id="c-occ" min="0" max="0.6" step="0.01" value="0">
+          <div class="odd-hint">ODD requires <b>&lt; 35%</b></div>
+        </div>
+        <div class="ctl">
+          <div class="lab"><label for="c-kappa">Road curvature &kappa;</label><span class="val mono"><span id="o-kappa">0.012</span><span class="u"> 1/m</span></span></div>
+          <input type="range" id="c-kappa" min="-0.05" max="0.05" step="0.001" value="0.012">
+          <div class="odd-hint">trained envelope <b>&plusmn;0.02</b>, ODD limit &plusmn;0.022</div>
+        </div>
+
+        <div class="subhd">Driver</div>
+        <div class="ctl">
+          <div class="lab"><label for="c-work">Workload</label><span class="val mono" id="o-work">20%</span></div>
+          <input type="range" id="c-work" min="0" max="1" step="0.01" value="0.2">
+        </div>
+        <div class="ctl">
+          <div class="lab"><label for="c-conf">Conflict (steers against automation)</label><span class="val mono" id="o-conf">0%</span></div>
+          <input type="range" id="c-conf" min="0" max="1" step="0.01" value="0">
+        </div>
+        <div class="toggle">
+          <span>Driver available (hands on)</span>
+          <label class="switch"><input type="checkbox" id="c-avail" checked><span class="sl"></span></label>
+        </div>
+
+        <div class="subhd">Scenario presets</div>
+        <div class="presets" id="presets">
+          <button data-p="clear">Clear</button>
+          <button data-p="fog">Fog + blur</button>
+          <button data-p="occluded">Occluded</button>
+          <button data-p="ood">OOD curve</button>
+          <button data-p="conflict">Driver conflict</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TELEMETRY -->
+  <div class="telemetry">
+    <div class="gauges">
+      <div class="card gauge"><div class="bd">
+        <div class="gl"><span class="name">Integrity I</span><span class="num mono" id="g-int">1.00</span></div>
+        <div class="bar"><div class="fill" id="g-int-fill" style="width:100%;background:var(--good)"></div></div>
+        <div class="gsub"><span>uncertainty <b class="mono" id="g-sunc">1.0</b></span><span>NIS <b class="mono" id="g-snis">1.0</b></span><span>ODD <b class="mono" id="g-sodd">1.0</b></span></div>
+      </div></div>
+
+      <div class="card gauge"><div class="bd">
+        <div class="gl"><span class="name">Innovation NIS</span><span class="num mono" id="g-nis">0.0</span></div>
+        <div class="bar"><div class="fill" id="g-nis-fill" style="width:5%;background:var(--accent)"></div>
+          <div class="mark" id="g-nis-mark" data-l="&chi;&sup2; 9.21" style="left:30%"></div></div>
+        <canvas class="spark" id="nis-spark" width="300" height="30"></canvas>
+      </div></div>
+
+      <div class="card gauge"><div class="bd">
+        <div class="gl"><span class="name">Authority &lambda;</span><span class="num mono" id="g-lam">0.95</span></div>
+        <div class="authbar"><div class="a" id="g-lam-a" style="width:95%"></div><div class="h" id="g-lam-h" style="width:5%"></div></div>
+        <div class="gsub"><span><b style="color:var(--proposed)">&#9632;</b> automation</span><span><b style="color:var(--naive)">&#9632;</b> driver</span></div>
+      </div></div>
+    </div>
+
+    <div class="charts">
+      <div class="card chart"><div class="hd"><h2>Lateral error e_y</h2><span class="mono" style="font-size:11px;color:var(--muted)">last 20 s</span></div>
+        <div class="bd"><canvas id="chart-e" width="560" height="150"></canvas>
+          <div class="legend"><span><i style="background:var(--accent)"></i>true e_y</span><span><i style="background:var(--faint)"></i>perceived</span><span><i style="background:var(--crit)"></i>&plusmn;0.7 m lane edge</span></div>
+        </div></div>
+      <div class="card chart"><div class="hd"><h2>Trust signals</h2><span class="mono" style="font-size:11px;color:var(--muted)">last 20 s</span></div>
+        <div class="bd"><canvas id="chart-t" width="560" height="150"></canvas>
+          <div class="legend"><span><i style="background:var(--good)"></i>integrity I</span><span><i style="background:var(--accent)"></i>authority &lambda;</span><span><i style="background:var(--warn)"></i>NIS / &chi;&sup2;</span></div>
+        </div></div>
+    </div>
+  </div>
+
+  <footer>
+    Physics, perception, Kalman/NIS monitor and shared-control law are the same equations as the
+    <code>trustdrive</code> Python package. Kinematic lane-error model at v&nbsp;=&nbsp;15&nbsp;m/s,
+    L&nbsp;=&nbsp;2.7&nbsp;m, T<sub>s</sub>&nbsp;=&nbsp;0.05&nbsp;s; NIS tested against
+    &chi;&sup2;(2)&nbsp;=&nbsp;9.21; integrity I&nbsp;=&nbsp;s<sub>unc</sub>&middot;s<sub>NIS</sub>&middot;s<sub>ODD</sub>.
+  </footer>
+</div>
+
+<script>
+"use strict";
+/* ---------- constants (identical to the Python package) ---------- */
+const L=2.7, TS=0.05, VNOM=15.0, DMAX=0.6;
+const KTRAIN=0.02, BASE_STD=[0.02,0.01];
+const CHI2=9.210;
+const ODD={kmax:0.022,bmin:0.45,blurmax:1.6,occmax:0.35};
+const IC={sigma_ref:0.02,nis_scale:6.0,ema:0.4};
+const SC={v_floor:0.4,lam_min:0.05,lam_max:0.95,w_pen:0.35};
+const DRV={kh:[0.12,0.9],delay:4,noise:0.02};
+const HANDOVER_THR=0.0045;
+
+/* ---------- tiny 2x2 linear algebra ---------- */
+const clip=(x,a,b)=>x<a?a:(x>b?b:x);
+function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function mInv2(M){const[a,b,c,d]=[M[0][0],M[0][1],M[1][0],M[1][1]];const det=a*d-b*c;
+  return[[d/det,-b/det],[-c/det,a/det]];}
+
+/* ---------- gain-scheduled LQR (Riccati iteration) ---------- */
+const Q=[[1,0],[0,5]], Rw=8.0;
+const _Kcache={};
+function gainAt(v){
+  const key=Math.round(v*10)/10;
+  if(_Kcache[key])return _Kcache[key];
+  const A=[[1,v*TS],[0,1]], B=[0,v*TS/L];
+  let P=[[1,0],[0,5]];
+  for(let n=0;n<400;n++){
+    const Pb=[P[0][0]*B[0]+P[0][1]*B[1], P[1][0]*B[0]+P[1][1]*B[1]];
+    const BtPB=B[0]*Pb[0]+B[1]*Pb[1], r=Rw+BtPB;
+    const BtPA=[Pb[0]*A[0][0]+Pb[1]*A[1][0], Pb[0]*A[0][1]+Pb[1]*A[1][1]];
+    const K=[BtPA[0]/r,BtPA[1]/r];
+    // A'PA
+    const At=[[A[0][0],A[1][0]],[A[0][1],A[1][1]]];
+    const AtP=[[At[0][0]*P[0][0]+At[0][1]*P[1][0], At[0][0]*P[0][1]+At[0][1]*P[1][1]],
+               [At[1][0]*P[0][0]+At[1][1]*P[1][0], At[1][0]*P[0][1]+At[1][1]*P[1][1]]];
+    const AtPA=[[AtP[0][0]*A[0][0]+AtP[0][1]*A[1][0], AtP[0][0]*A[0][1]+AtP[0][1]*A[1][1]],
+                [AtP[1][0]*A[0][0]+AtP[1][1]*A[1][0], AtP[1][0]*A[0][1]+AtP[1][1]*A[1][1]]];
+    const AtPB=[AtP[0][0]*B[0]+AtP[0][1]*B[1], AtP[1][0]*B[0]+AtP[1][1]*B[1]];
+    P=[[Q[0][0]+AtPA[0][0]-AtPB[0]*K[0], Q[0][1]+AtPA[0][1]-AtPB[0]*K[1]],
+       [Q[1][0]+AtPA[1][0]-AtPB[1]*K[0], Q[1][1]+AtPA[1][1]-AtPB[1]*K[1]]];
+  }
+  const Pb=[P[0][0]*B[0]+P[0][1]*B[1], P[1][0]*B[0]+P[1][1]*B[1]];
+  const r=Rw+B[0]*Pb[0]+B[1]*Pb[1];
+  const BtPA=[Pb[0]*A[0][0]+Pb[1]*A[1][0], Pb[0]*A[0][1]+Pb[1]*A[1][1]];
+  const K=[BtPA[0]/r,BtPA[1]/r];
+  _Kcache[key]=K; return K;
+}
+const feedforward=k=>Math.atan(L*k);
+
+/* ---------- synthetic perception ---------- */
+function perceive(x,kappa,cond){
+  const blurT=1+2.5*cond.blur, darkT=1+1.5*Math.max(0,1-cond.brightness),
+        occT=1+3*cond.occlusion, kapT=1+4*Math.max(0,Math.abs(kappa)-KTRAIN);
+  const srep=[BASE_STD[0]*blurT*darkT*occT*kapT, BASE_STD[1]*blurT*darkT*occT*kapT];
+  const ood=Math.max(0,Math.abs(kappa)-KTRAIN)/KTRAIN;
+  const strue=[srep[0]*(1+1.2*ood), srep[1]*(1+1.2*ood)];
+  const bias=[0.18*ood*Math.sign(kappa||1), 0.05*ood];
+  const mean=[x[0]+bias[0]+randn()*strue[0], x[1]+bias[1]+randn()*strue[1]];
+  const cov=[[srep[0]*srep[0],0],[0,srep[1]*srep[1]]];
+  return {mean,cov,srep,trace:srep[0]*srep[0]+srep[1]*srep[1]};
+}
+
+/* ---------- Kalman monitor (fixed at nominal v) ---------- */
+const KF={A:[[1,VNOM*TS],[0,1]], B:[0,VNOM*TS/L], E:[0,-VNOM*TS],
+  Qk:[[1e-4,0],[0,1e-4]], x:[0.3,0.02], P:[[0.05,0],[0,0.02]]};
+function kfPredict(delta,kappa){
+  const A=KF.A;
+  KF.x=[A[0][0]*KF.x[0]+A[0][1]*KF.x[1]+KF.B[0]*delta+KF.E[0]*kappa,
+        A[1][0]*KF.x[0]+A[1][1]*KF.x[1]+KF.B[1]*delta+KF.E[1]*kappa];
+  const AP=[[A[0][0]*KF.P[0][0]+A[0][1]*KF.P[1][0], A[0][0]*KF.P[0][1]+A[0][1]*KF.P[1][1]],
+            [A[1][0]*KF.P[0][0]+A[1][1]*KF.P[1][0], A[1][0]*KF.P[0][1]+A[1][1]*KF.P[1][1]]];
+  KF.P=[[AP[0][0]*A[0][0]+AP[0][1]*A[0][1]+KF.Qk[0][0], AP[0][0]*A[1][0]+AP[0][1]*A[1][1]],
+        [AP[1][0]*A[0][0]+AP[1][1]*A[0][1], AP[1][0]*A[1][0]+AP[1][1]*A[1][1]+KF.Qk[1][1]]];
+}
+function kfUpdate(y,R){
+  const nu=[y[0]-KF.x[0], y[1]-KF.x[1]];
+  const S=[[KF.P[0][0]+R[0][0],KF.P[0][1]],[KF.P[1][0],KF.P[1][1]+R[1][1]]];
+  const Si=mInv2(S);
+  const nis=nu[0]*(Si[0][0]*nu[0]+Si[0][1]*nu[1])+nu[1]*(Si[1][0]*nu[0]+Si[1][1]*nu[1]);
+  const K=[[KF.P[0][0]*Si[0][0]+KF.P[0][1]*Si[1][0], KF.P[0][0]*Si[0][1]+KF.P[0][1]*Si[1][1]],
+           [KF.P[1][0]*Si[0][0]+KF.P[1][1]*Si[1][0], KF.P[1][0]*Si[0][1]+KF.P[1][1]*Si[1][1]]];
+  KF.x=[KF.x[0]+K[0][0]*nu[0]+K[0][1]*nu[1], KF.x[1]+K[1][0]*nu[0]+K[1][1]*nu[1]];
+  const IK=[[1-K[0][0],-K[0][1]],[-K[1][0],1-K[1][1]]];
+  KF.P=[[IK[0][0]*KF.P[0][0]+IK[0][1]*KF.P[1][0], IK[0][0]*KF.P[0][1]+IK[0][1]*KF.P[1][1]],
+        [IK[1][0]*KF.P[0][0]+IK[1][1]*KF.P[1][0], IK[1][0]*KF.P[0][1]+IK[1][1]*KF.P[1][1]]];
+  return nis;
+}
+
+/* ---------- ODD + integrity ---------- */
+function oddMargins(kappa,b,blur,occ){return[
+  1-Math.abs(kappa)/ODD.kmax,(b-ODD.bmin)/(1-ODD.bmin),1-blur/ODD.blurmax,1-occ/ODD.occmax];}
+const oddInside=(k,b,bl,o)=>oddMargins(k,b,bl,o).every(m=>m>0);
+let integrityI=1.0;
+function integUpdate(trace,nis,kappa,b,blur,occ){
+  const sUnc=Math.exp(-trace/IC.sigma_ref);
+  const sNis=Math.exp(-Math.max(0,nis-CHI2)/IC.nis_scale);
+  const worst=Math.min(...oddMargins(kappa,b,blur,occ));
+  const sOdd=1/(1+Math.exp(-6*worst));
+  const raw=sUnc*sNis*sOdd;
+  integrityI=(1-IC.ema)*integrityI+IC.ema*raw;
+  return {I:integrityI,sUnc,sNis,sOdd};
+}
+
+/* ---------- shared control ---------- */
+function authority(I,W,avail){
+  let lam=I+SC.w_pen*W*(I-0.5);
+  if(!avail)lam=Math.max(lam,0.85);
+  return clip(lam,SC.lam_min,SC.lam_max);
+}
+const refSpeed=I=>VNOM*(SC.v_floor+(1-SC.v_floor)*I);
+function modeOf(I,W,avail){
+  if(I>0.75)return"automation"; if(I>0.4)return"shared";
+  if(!avail||W>0.7)return"degrade + shared"; return"driver";}
+
+/* ---------- driver ---------- */
+const driver={buf:[[0,0],[0,0],[0,0],[0,0],[0,0]]};
+function driverCmd(x,W,avail,conflict){
+  driver.buf.push([x[0],x[1]]); if(driver.buf.length>DRV.delay+1)driver.buf.shift();
+  const xd=driver.buf[0];
+  let d=-(DRV.kh[0]*xd[0]+DRV.kh[1]*xd[1]);
+  const en=DRV.noise*(1+2*W);
+  d=(1-0.5*W)*d+randn()*en;
+  if(conflict>0)d=d-conflict*0.4*Math.sign(d||1);
+  if(!avail)d=0;
+  return clip(d,-DMAX,DMAX);
+}
+
+/* ---------- simulation state ---------- */
+const st={
+  x:[0.3,0.02], prevDelta:0, dist:0,
+  method:"proposed",
+  cond:{brightness:1,blur:0,occlusion:0}, kappa:0.012, workload:0.2, avail:true, conflict:0,
+  vref:VNOM, lam:0.95, mode:"automation", nis:0, trace:BASE_STD[0]**2+BASE_STD[1]**2,
+  I:1, sUnc:1,sNis:1,sOdd:1, y:[0.3,0.02], srep:BASE_STD.slice(),
+  exits:0, wasOut:false,
+  hist:{e:[],yp:[],I:[],lam:[],nis:[]}, HN:400
+};
+function resetSim(hard){
+  st.x=[0.3,0.02]; st.prevDelta=0; st.dist=0; st.exits=0; st.wasOut=false;
+  KF.x=[0.3,0.02]; KF.P=[[0.05,0],[0,0.02]]; integrityI=1.0; st.I=1;
+  driver.buf=[[0,0],[0,0],[0,0],[0,0],[0,0]];
+  for(const k in st.hist)st.hist[k]=[];
+}
+function pushHist(){
+  const h=st.hist;
+  h.e.push(st.x[0]); h.yp.push(st.y[0]); h.I.push(st.I); h.lam.push(st.lam);
+  h.nis.push(st.nis);
+  for(const k in h)if(h[k].length>st.HN)h[k].shift();
+}
+
+function step(){
+  const {cond,kappa,workload:W,avail,conflict,method}=st;
+  const truth=[st.x[0],st.x[1]];
+  const po=perceive(truth,kappa,cond); st.y=po.mean; st.srep=po.srep; st.trace=po.trace;
+  kfPredict(st.prevDelta,kappa);
+  st.nis=kfUpdate(po.mean,po.cov);
+  const comps=integUpdate(po.trace,st.nis,kappa,cond.brightness,cond.blur,cond.occlusion);
+  st.I=comps.I; st.sUnc=comps.sUnc; st.sNis=comps.sNis; st.sOdd=comps.sOdd;
+
+  const xhat = method==="proposed"?[KF.x[0],KF.x[1]]:po.mean;
+  const vcmd = method==="proposed"?refSpeed(st.I):VNOM;
+  const K=gainAt(vcmd);
+  const ff=feedforward(kappa);
+  const fbAuto=-(K[0]*xhat[0]+K[1]*xhat[1]);
+  const deltaAuto=clip(ff+fbAuto,-DMAX,DMAX);
+  const deltaHuman=driverCmd(truth,W,avail,conflict);
+
+  let delta,lam,vref,mode;
+  if(method==="naive"){lam=1;vref=VNOM;delta=deltaAuto;mode="automation";}
+  else if(method==="handover"){
+    const unsafe=po.trace>HANDOVER_THR; lam=unsafe?0:1; vref=VNOM;
+    delta=unsafe?deltaHuman:deltaAuto; mode=unsafe?"driver":"automation";
+  } else {
+    lam=authority(st.I,W,avail);
+    delta=clip(ff+lam*fbAuto+(1-lam)*deltaHuman,-DMAX,DMAX);
+    vref=refSpeed(st.I); mode=modeOf(st.I,W,avail);
+  }
+  st.lam=lam; st.vref=vref; st.mode=mode;
+
+  // advance plant
+  const d=clip(delta,-DMAX,DMAX);
+  st.x=[st.x[0]+vref*Math.sin(st.x[1])*TS,
+        st.x[1]+(vref/L*Math.tan(d)-vref*kappa)*TS];
+  st.prevDelta=delta; st.dist+=vref*TS;
+
+  // lane-exit counting (rising edge)
+  const out=Math.abs(st.x[0])>0.7;
+  if(out&&!st.wasOut)st.exits++;
+  st.wasOut=out;
+  pushHist();
+}
+
+/* ---------- theme-aware canvas colors ---------- */
+let TOK={};
+function refreshTok(){
+  const cs=getComputedStyle(document.documentElement);
+  ["ground","panel","panel2","inset","ink","muted","faint","line","accent","good","warn","crit","grid","naive","handover","proposed"]
+    .forEach(n=>TOK[n]=cs.getPropertyValue("--"+n).trim());
+}
+matchMedia("(prefers-color-scheme:dark)").addEventListener("change",refreshTok);
+new MutationObserver(refreshTok).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+
+/* ---------- rendering ---------- */
+const road=document.getElementById("road"), rctx=road.getContext("2d");
+const cam=document.getElementById("camera"), cctx=cam.getContext("2d");
+const chE=document.getElementById("chart-e"), ecx=chE.getContext("2d");
+const chT=document.getElementById("chart-t"), tcx=chT.getContext("2d");
+const spark=document.getElementById("nis-spark"), scx=spark.getContext("2d");
+
+function sizeAll(){
+  [[road,rctx],[chE,ecx],[chT,tcx],[spark,scx]].forEach(([c,x])=>{
+    const r=c.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);
+    if(r.width){c.width=Math.round(r.width*dpr);c.height=Math.round(r.height*dpr);
+      x.setTransform(dpr,0,0,dpr,0,0);}
+  });
+  const cr=cam.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);
+  cam.width=Math.round(cr.width*dpr);cam.height=Math.round(cr.height*dpr);
+  cctx.setTransform(dpr,0,0,dpr,0,0);
+}
+addEventListener("resize",sizeAll);
+
+function drawRoad(){
+  const W=road.getBoundingClientRect().width, H=road.getBoundingClientRect().height;
+  if(!W)return;
+  const outOfLane=Math.abs(st.x[0])>0.7;
+  rctx.clearRect(0,0,W,H);
+  // sky/ground bg
+  rctx.fillStyle=TOK.inset; rctx.fillRect(0,0,W,H);
+  const cx=W/2, latS=42, fwdS=(H-20)/40; // px per m lateral / forward, 40 m ahead
+  const halfLane=1.75, roadHalf=3.4;
+  // road surface (curved) as a filled polygon
+  const centerX=d=>cx + latS*(0.5*st.kappa*d*d) - latS*0*st.x[1];
+  const yOf=d=>H-10 - d*fwdS;
+  rctx.beginPath();
+  for(let d=0;d<=40;d+=1){const x=centerX(d)-roadHalf*latS, y=yOf(d); d===0?rctx.moveTo(x,y):rctx.lineTo(x,y);}
+  for(let d=40;d>=0;d-=1){const x=centerX(d)+roadHalf*latS, y=yOf(d); rctx.lineTo(x,y);}
+  rctx.closePath();
+  rctx.fillStyle=document.documentElement.getAttribute("data-theme")==="dark"||
+    (matchMedia("(prefers-color-scheme:dark)").matches&&document.documentElement.getAttribute("data-theme")!=="light")
+    ?"#20272e":"#cfd6dd";
+  rctx.fill();
+  // lane edge lines + center dashes
+  function line(off,dash,col){
+    rctx.beginPath();
+    for(let d=0;d<=40;d+=0.5){const x=centerX(d)+off*latS,y=yOf(d); d===0?rctx.moveTo(x,y):rctx.lineTo(x,y);}
+    rctx.strokeStyle=col; rctx.lineWidth=2.4;
+    if(dash){rctx.setLineDash([9,11]); rctx.lineDashOffset=-(st.dist*fwdS)%20;} else rctx.setLineDash([]);
+    rctx.stroke(); rctx.setLineDash([]);
+  }
+  const edgeCol=outOfLane?TOK.crit:"#e9c14a";
+  line(-halfLane,false,edgeCol); line(halfLane,false,edgeCol);
+  line(0,true,"rgba(255,255,255,.6)");
+  // perceived position ghost
+  const pgx=cx+latS*st.y[0], pgy=H-10-0.3*fwdS;
+  rctx.strokeStyle=TOK.faint; rctx.lineWidth=1.5; rctx.setLineDash([3,3]);
+  rctx.strokeRect(pgx-9,pgy-16,18,32); rctx.setLineDash([]);
+  // vehicle
+  const vx=cx+latS*st.x[0], vy=H-10-0.3*fwdS;
+  rctx.save(); rctx.translate(vx,vy); rctx.rotate(-st.x[1]);
+  rctx.fillStyle=st.method==="naive"?TOK.naive:st.method==="handover"?TOK.handover:TOK.proposed;
+  roundRect(rctx,-10,-18,20,36,5); rctx.fill();
+  rctx.fillStyle="rgba(255,255,255,.85)"; rctx.fillRect(-6,-12,12,7);
+  rctx.restore();
+  // degradation veil (brightness/occlusion) to hint conditions on the truth view lightly
+  if(st.cond.brightness<1){rctx.fillStyle=`rgba(6,10,16,${(1-st.cond.brightness)*0.35})`;rctx.fillRect(0,0,W,H);}
+  if(outOfLane){rctx.strokeStyle=TOK.crit;rctx.lineWidth=3;rctx.strokeRect(1.5,1.5,W-3,H-3);}
+}
+function roundRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);
+  c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
+
+function drawCamera(){
+  const W=cam.getBoundingClientRect().width, H=cam.getBoundingClientRect().height;
+  if(!W)return;
+  const c=st.cond, f=W*0.85, camH=1.25, cxp=W/2, horizon=0.34*H;
+  cctx.setTransform(Math.min(devicePixelRatio||1,2),0,0,Math.min(devicePixelRatio||1,2),0,0);
+  cctx.clearRect(0,0,W,H);
+  cctx.fillStyle="#232a30"; cctx.fillRect(0,0,W,H);
+  cctx.fillStyle="#2f3740"; cctx.fillRect(0,0,W,horizon); // sky band
+  cctx.filter=c.blur>0?`blur(${c.blur*1.4}px)`:"none";
+  const yroad=s=>-st.x[0]-st.x[1]*s+0.5*st.kappa*s*s;
+  function lane(off,col,w){
+    cctx.beginPath();let started=false;
+    for(let s=3;s<=45;s+=0.5){const y=yroad(s)+off;const u=cxp+f*y/s, v=horizon+f*camH/s;
+      if(v<horizon||v>H)continue; started?cctx.lineTo(u,v):cctx.moveTo(u,v);started=true;}
+    cctx.strokeStyle=col;cctx.lineWidth=w;cctx.stroke();
+  }
+  lane(-1.75,"#e9e9ea",2.4); lane(1.75,"#e9e9ea",2.4); lane(0,"rgba(230,230,230,.55)",1.6);
+  cctx.filter="none";
+  if(c.occlusion>0){cctx.fillStyle="#161b20";cctx.fillRect(0,horizon,W,c.occlusion*(H-horizon));}
+  if(c.brightness<1){cctx.fillStyle=`rgba(0,0,0,${(1-c.brightness)*0.8})`;cctx.fillRect(0,0,W,H);}
+  // sensor noise
+  const nN=Math.floor(W*H*0.02*(0.4+st.srep[0]*4));
+  cctx.fillStyle="rgba(255,255,255,.10)";
+  for(let i=0;i<nN;i++)cctx.fillRect(Math.random()*W,Math.random()*H,1,1);
+}
+
+/* charts */
+function grid(cx2,W,H){cx2.strokeStyle=TOK.grid;cx2.lineWidth=1;
+  for(let i=0;i<=4;i++){const y=6+(H-12)*i/4;cx2.beginPath();cx2.moveTo(2,y);cx2.lineTo(W-2,y);cx2.stroke();}}
+function trace(cx2,arr,map,col,W,H,wdt){cx2.beginPath();const n=st.HN;
+  for(let i=0;i<arr.length;i++){const x=2+(W-4)*(i+(n-arr.length))/(n-1);const y=map(arr[i],H);
+    i===0?cx2.moveTo(x,y):cx2.lineTo(x,y);}
+  cx2.strokeStyle=col;cx2.lineWidth=wdt||1.6;cx2.stroke();}
+function drawCharts(){
+  let W=chE.getBoundingClientRect().width,H=chE.getBoundingClientRect().height;
+  if(W){ecx.clearRect(0,0,W,H);ecx.fillStyle=TOK.panel;ecx.fillRect(0,0,W,H);grid(ecx,W,H);
+    const mapE=(v)=>{const lim=1.0;return 6+(H-12)*(1-(clip(v,-lim,lim)+lim)/(2*lim));};
+    // lane band
+    ecx.fillStyle=(TOK.crit)+"22";ecx.fillRect(2,mapE(0.7),W-4,mapE(-0.7)-mapE(0.7));
+    ecx.strokeStyle=TOK.crit;ecx.setLineDash([4,4]);ecx.lineWidth=1;
+    [0.7,-0.7].forEach(v=>{ecx.beginPath();ecx.moveTo(2,mapE(v));ecx.lineTo(W-2,mapE(v));ecx.stroke();});
+    ecx.setLineDash([]);
+    ecx.strokeStyle=TOK.line;ecx.beginPath();ecx.moveTo(2,mapE(0));ecx.lineTo(W-2,mapE(0));ecx.stroke();
+    trace(ecx,st.hist.yp,mapE,TOK.faint,W,H,1);
+    trace(ecx,st.hist.e,mapE,TOK.accent,W,H,2);
+  }
+  W=chT.getBoundingClientRect().width;H=chT.getBoundingClientRect().height;
+  if(W){tcx.clearRect(0,0,W,H);tcx.fillStyle=TOK.panel;tcx.fillRect(0,0,W,H);grid(tcx,W,H);
+    const map01=(v,h)=>6+(h-12)*(1-clip(v,0,1));
+    trace(tcx,st.hist.nis.map(n=>Math.min(n/CHI2,3)/3),map01,TOK.warn,W,H,1.3);
+    // chi2 threshold at nis/chi2=1 -> value 1/3
+    tcx.strokeStyle=TOK.warn+"77";tcx.setLineDash([3,3]);tcx.beginPath();
+    tcx.moveTo(2,map01(1/3,H));tcx.lineTo(W-2,map01(1/3,H));tcx.stroke();tcx.setLineDash([]);
+    trace(tcx,st.hist.lam,map01,TOK.accent,W,H,1.8);
+    trace(tcx,st.hist.I,map01,TOK.good,W,H,2);
+  }
+  // NIS sparkline
+  W=spark.getBoundingClientRect().width;H=spark.getBoundingClientRect().height;
+  if(W){scx.clearRect(0,0,W,H);
+    const map=(v)=>2+(H-4)*(1-Math.min(v/(3*CHI2),1));
+    scx.strokeStyle=TOK.warn+"66";scx.setLineDash([3,3]);scx.beginPath();
+    scx.moveTo(0,map(CHI2));scx.lineTo(W,map(CHI2));scx.stroke();scx.setLineDash([]);
+    trace(scx,st.hist.nis,(v)=>map(v),st.nis>CHI2?TOK.crit:TOK.warn,W,H,1.5);
+  }
+}
+
+/* ---------- HUD / telemetry DOM ---------- */
+const $=id=>document.getElementById(id);
+function bandColor(I){return I>0.75?TOK.good:I>0.4?TOK.warn:TOK.crit;}
+function updateDOM(){
+  $("s-rmse").textContent=rmseWin().toFixed(3);
+  $("s-exits").textContent=st.exits;
+  $("v-speed").textContent=st.vref.toFixed(1)+" m/s";
+  $("hud-ey").textContent=st.x[0].toFixed(2);
+  $("hud-mode").textContent=st.mode;
+  const inside=oddInside(st.kappa,st.cond.brightness,st.cond.blur,st.cond.occlusion);
+  const odd=$("hud-odd"); odd.textContent=inside?"inside ODD":"outside ODD";
+  odd.className="chip "+(inside?"ok":"bad");
+  $("cam-nis").textContent="NIS "+st.nis.toFixed(1);
+  $("cam-sy").textContent=st.srep[0].toFixed(3)+" m";
+  $("cam-sp").textContent=st.srep[1].toFixed(3)+" rad";
+  // integrity
+  $("g-int").textContent=st.I.toFixed(2);
+  const gif=$("g-int-fill");gif.style.width=(st.I*100)+"%";gif.style.background=bandColor(st.I);
+  $("g-sunc").textContent=st.sUnc.toFixed(2);$("g-snis").textContent=st.sNis.toFixed(2);$("g-sodd").textContent=st.sOdd.toFixed(2);
+  // NIS gauge (scale 0..30)
+  $("g-nis").textContent=st.nis.toFixed(1);
+  const nf=$("g-nis-fill");nf.style.width=Math.min(st.nis/30*100,100)+"%";
+  nf.style.background=st.nis>CHI2?TOK.crit:TOK.accent;
+  $("g-nis-mark").style.left=(CHI2/30*100)+"%";
+  // authority
+  $("g-lam").textContent=st.lam.toFixed(2);
+  $("g-lam-a").style.width=(st.lam*100)+"%";$("g-lam-h").style.width=((1-st.lam)*100)+"%";
+}
+function rmseWin(){const e=st.hist.e;if(!e.length)return 0;let s=0;for(const v of e)s+=v*v;return Math.sqrt(s/e.length);}
+
+/* ---------- main loop ---------- */
+let playing=true, acc=0, last=performance.now(), speed=1;
+function frame(now){
+  const dt=Math.min((now-last)/1000,0.1); last=now;
+  if(playing){acc+=dt*speed; let guard=0;
+    while(acc>=TS&&guard<240){step();acc-=TS;guard++;}}
+  drawRoad(); drawCamera(); drawCharts(); updateDOM();
+  requestAnimationFrame(frame);
+}
+
+/* ---------- controls wiring ---------- */
+function setMethod(m){st.method=m;
+  document.querySelectorAll(".seg button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.m===m?"true":"false"));
+  resetSim();}
+document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>setMethod(b.dataset.m));
+
+function bindSlider(id,out,fmt,apply){const el=$(id);
+  const upd=()=>{const v=parseFloat(el.value);out.textContent=fmt(v);apply(v);
+    el.style.setProperty("--track",`linear-gradient(90deg,var(--accent) ${(v-el.min)/(el.max-el.min)*100}%,var(--line) 0)`);};
+  el.addEventListener("input",upd);upd();}
+bindSlider("c-bright",$("o-bright"),v=>v.toFixed(2),v=>st.cond.brightness=v);
+bindSlider("c-blur",$("o-blur"),v=>v.toFixed(1),v=>st.cond.blur=v);
+bindSlider("c-occ",$("o-occ"),v=>Math.round(v*100)+"%",v=>st.cond.occlusion=v);
+bindSlider("c-kappa",$("o-kappa"),v=>v.toFixed(3),v=>st.kappa=v);
+bindSlider("c-work",$("o-work"),v=>Math.round(v*100)+"%",v=>st.workload=v);
+bindSlider("c-conf",$("o-conf"),v=>Math.round(v*100)+"%",v=>st.conflict=v);
+$("c-avail").addEventListener("change",e=>st.avail=e.target.checked);
+
+$("playbtn").onclick=function(){playing=!playing;this.textContent=playing?"Pause":"Play";};
+$("resetbtn").onclick=()=>resetSim();
+$("speed").onchange=e=>speed=parseFloat(e.target.value);
+
+const PRESETS={
+  clear:{m:"proposed",b:1,bl:0,o:0,k:0.012,w:0.2,av:true,cf:0},
+  fog:{m:"proposed",b:0.6,bl:2.6,o:0.1,k:0.012,w:0.25,av:true,cf:0},
+  occluded:{m:"proposed",b:0.85,bl:0.4,o:0.45,k:0.012,w:0.3,av:true,cf:0},
+  ood:{m:"proposed",b:1,bl:0,o:0,k:0.04,w:0.3,av:true,cf:0},
+  conflict:{m:"proposed",b:1,bl:0,o:0,k:0.012,w:0.8,av:true,cf:0.8}
+};
+function applyPreset(p){const c=PRESETS[p];
+  $("c-bright").value=c.b;$("c-blur").value=c.bl;$("c-occ").value=c.o;$("c-kappa").value=c.k;
+  $("c-work").value=c.w;$("c-conf").value=c.cf;$("c-avail").checked=c.av;
+  ["c-bright","c-blur","c-occ","c-kappa","c-work","c-conf"].forEach(id=>$(id).dispatchEvent(new Event("input")));
+  st.avail=c.av; setMethod(c.m);}
+document.querySelectorAll("#presets button").forEach(b=>b.onclick=()=>applyPreset(b.dataset.p));
+
+/* ---------- boot ---------- */
+function boot(){refreshTok();sizeAll();requestAnimationFrame(frame);}
+if(document.readyState==="complete"||document.readyState==="interactive")setTimeout(boot,60);
+else addEventListener("DOMContentLoaded",boot);
+addEventListener("load",()=>{sizeAll();refreshTok();});
+</script>

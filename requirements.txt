@@ -1,0 +1,10 @@
+# Core closed loop (runs with only these two):
+numpy>=1.24
+matplotlib>=3.6
+
+# Optional -- only needed for the CNN perception backend
+# (experiments/train_perception.py and `benchmark.py --cnn`).
+# torch>=2.0
+
+# Optional -- only needed to execute notebooks/workshop.ipynb
+# jupyter>=1.0
